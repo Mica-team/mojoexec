@@ -30,9 +30,6 @@ static const char* sphal_namespaces[3] = {
         "default"
 };
 
-/**
- * Pass the handles obtained from Android's linker to this library.
- */
 __attribute__((visibility("default"), used))
 void app__pojav_linkerhook_pass_handles(
         void* data,
@@ -50,12 +47,6 @@ void app__pojav_linkerhook_pass_handles(
             android_get_exported_namespace;
 }
 
-/**
- * Intercept Vulkan library loading.
- *
- * For Vulkan libraries, return the already-loaded custom Vulkan driver.
- * Everything else is forwarded to Android's real android_dlopen_ext().
- */
 __attribute__((visibility("default"), used))
 void* android_dlopen_ext(
         const char* filename,
@@ -66,13 +57,6 @@ void* android_dlopen_ext(
         return NULL;
     }
 
-    /*
-     * Only intercept Vulkan libraries.
-     *
-     * strstr() is used here because Android may request names such as:
-     * libvulkan.so
-     * libvulkan.so.1
-     */
     if (strstr(filename, "vulkan.") == NULL) {
         return android_dlopen_ext_p(
                 filename,
@@ -89,9 +73,6 @@ void* android_dlopen_ext(
     return ready_handle;
 }
 
-/**
- * Load a library through Android's SP-HAL/vendor namespace.
- */
 __attribute__((visibility("default"), used))
 void* android_load_sphal_library(
         const char* filename,
@@ -103,18 +84,12 @@ void* android_load_sphal_library(
         return NULL;
     }
 
-    /*
-     * Vulkan is supplied by our custom driver.
-     */
     if (strstr(filename, "vulkan.") != NULL) {
         return ready_handle;
     }
 
     struct android_namespace_t* androidNamespace = NULL;
 
-    /*
-     * Try the available exported namespaces in order.
-     */
     for (int i = 0; i < 3; i++) {
         androidNamespace =
                 android_get_exported_namespace_p(sphal_namespaces[i]);
@@ -124,9 +99,6 @@ void* android_load_sphal_library(
         }
     }
 
-    /*
-     * If none of the namespaces exist, fall back to the normal loader.
-     */
     if (androidNamespace == NULL) {
         return android_dlopen_ext_p(
                 filename,
@@ -137,11 +109,9 @@ void* android_load_sphal_library(
     }
 
     /*
-     * Explicitly initialize the structure.
-     * This is important because android_dlextinfo contains fields
-     * other than flags and library_namespace.
+     * Zero-initialize the complete android_dlextinfo structure.
      */
-    android_dlextinfo info = {};
+    android_dlextinfo info = {0};
 
     info.flags = ANDROID_DLEXT_USE_NAMESPACE;
     info.library_namespace = androidNamespace;
@@ -154,10 +124,6 @@ void* android_load_sphal_library(
     );
 }
 
-/**
- * Compatibility implementation for older Android versions which
- * don't export atrace_get_enabled_tags().
- */
 __attribute__((visibility("default"), used))
 uint64_t atrace_get_enabled_tags(void) {
     return 0;
